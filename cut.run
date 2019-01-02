@@ -1,0 +1,44 @@
+reset;
+model cut.mod;
+data cut.dat;
+option solver cplex;
+
+# solve the first optimization problem
+problem Cutting: x, Rolls, Demand;
+option relax_integrality 1;
+
+# solve the second optimization problem
+problem Pattern: y, ReducedCost, LargeRoll;
+option relax_integrality 0;
+
+# evaluate all patterns to determine which patterns are feasible
+let n := 0;
+for{i in W}
+{
+    let n := n + 1;
+	let a[i, n] := floor(L / i);
+	let {i2 in W: i2 <> i} a[i2, n] := 0;
+}
+
+# solve probelm 1, export duality results of problem 1 into problem 2, solve problem 2, and repeat until the objective function of problem 2 is non-negative
+repeat
+{
+    solve Cutting;
+	let{i in W} Crc[i] := Demand[i].dual;
+	
+	solve Pattern;
+	if ReducedCost < - 0.0001 then
+	{
+	    let n := n + 1;
+		let{i in W} a[i, n] := y[i];
+	} else break;
+}
+
+# display the pattern used and the number of large rolls required
+display a, x;
+option Cutting.relax_integrality 0;
+
+solve Cutting;
+display x;
+
+
